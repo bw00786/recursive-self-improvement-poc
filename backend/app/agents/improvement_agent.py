@@ -1,4 +1,4 @@
-"""Improvement agent (Qwen): propose ONE measurable, reversible modification.
+"""Improvement agent (Llama 3.1): propose ONE measurable, reversible modification.
 
 Structured output is validated; malformed LLM responses are rejected and the
 deterministic playbook is used instead, so the loop can never be derailed by a
@@ -109,7 +109,7 @@ def propose(db: Session, champion, analysis: dict, llm: AgentLLM) -> dict:
     tried = {e.strategy for e in db.query(Experiment).all() if e.strategy}
     stats = {s.strategy: s for s in db.query(StrategyStat).all()}
 
-    # Real mode: ask Qwen first; reject malformed output and fall back.
+    # Real mode: ask Llama first; reject malformed output and fall back.
     if not llm.is_mock:
         resp = llm.complete_json(
             "You are an AI systems optimization engineer.\n\n"

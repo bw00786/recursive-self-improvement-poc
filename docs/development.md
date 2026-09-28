@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Python 3.12+, Node 20+
-- Optional: Docker Desktop (sandbox isolation), Ollama + a Qwen model (real LLM)
+- Optional: Docker Desktop (sandbox isolation), Ollama + a Llama 3.1 model (real LLM)
 
 ## Setup
 
@@ -34,11 +34,11 @@ See `.env.example`. Key knobs: `OLLAMA_MODEL`, `MOCK_LLM` (auto/true/false),
 `SANDBOX_MODE` (auto/docker/local), `MIN_SCORE_IMPROVEMENT`,
 `HARD_MAX_LATENCY_SECONDS`, `EVAL_WEIGHTS` (JSON), `REQUIRE_HUMAN_APPROVAL`.
 
-## Using a real Qwen model
+## Using a real Llama 3.1 model
 
 ```bash
-ollama pull qwen3:8b          # or any Qwen3-family model
-# .env: OLLAMA_MODEL=qwen3:8b, MOCK_LLM=false
+ollama pull llama3.1:8b       # or any Llama 3.1 model
+# .env: OLLAMA_MODEL=llama3.1:8b, MOCK_LLM=false
 python scripts/bootstrap.py
 ```
 

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{REPO_ROOT / 'rail.db'}"
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen3:8b"
+    ollama_model: str = "llama3.1:8b"
     mock_llm: str = "auto"  # auto | true | false
 
     langfuse_enabled: bool = False

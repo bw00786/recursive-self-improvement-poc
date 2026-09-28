@@ -6,7 +6,7 @@
 ┌──────────────────────── CONTROL PLANE (never modifiable by the agent) ─┐
 │ benchmark/  evaluator  promotion rules  security  audit  human gate    │
 └─────────────────────────────────────────────────────────────────────────┘
-┌────────────────────── IMPROVEMENT AGENT (Qwen) ─────────────────────────┐
+┌────────────────────── IMPROVEMENT AGENT (Llama 3.1) ────────────────────┐
 │ analyze -> hypothesize -> research -> generate candidate                │
 └─────────────────────────────────────────────────────────────────────────┘
 ┌────────────────────── SYSTEM UNDER TEST (sut/) ─────────────────────────┐

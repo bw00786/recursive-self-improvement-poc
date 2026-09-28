@@ -1,4 +1,4 @@
-# Champion v0.1.0 configuration — baseline: Question -> Qwen -> Answer
+# Champion v0.1.0 configuration — baseline: Question -> Llama 3.1 -> Answer
 system_prompt: |
   You are a precise technical assistant. Answer the question concisely and accurately.
 query_rewrite: false

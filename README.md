@@ -7,7 +7,7 @@ self-improvement** of an AI agent.
 HUMAN OBJECTIVE
       │
       ▼
-IMPROVEMENT AGENT (Qwen via Ollama)
+IMPROVEMENT AGENT (Llama 3.1 via Ollama)
       │
       ├── Analyze failures
       ├── Research techniques
@@ -35,7 +35,7 @@ benchmark, the evaluator, or the promotion rules.
 
 | Component | Technology |
 |---|---|
-| LLM | Qwen3-family via Ollama (configurable, CPU-only OK) |
+| LLM | Llama 3.1 via Ollama (configurable, CPU-only OK) |
 | Agent loop | LangGraph |
 | Backend | FastAPI + SQLAlchemy + Pydantic |
 | Frontend | React + TypeScript + Vite + Material UI |
@@ -46,7 +46,7 @@ benchmark, the evaluator, or the promotion rules.
 
 ## Quick start (local, no Docker required for the core loop)
 
-Prereqs: Python 3.12+, Node 20+, optionally Ollama with a Qwen model.
+Prereqs: Python 3.12+, Node 20+, optionally Ollama with a Llama 3.1 model.
 
 ```bash
 # 1. Backend
@@ -80,14 +80,14 @@ approve or reject the candidate in the **Approvals** queue.
 cp .env.example .env        # edit OLLAMA_MODEL etc.
 docker compose up -d postgres ollama
 docker compose up -d backend frontend
-docker compose exec ollama ollama pull qwen3:8b   # or your configured model
+docker compose exec ollama ollama pull llama3.1:8b   # or your configured model
 ```
 
 ## Demo scenario
 
 1. `python scripts/bootstrap.py` → Champion v0.1.0 with baseline score.
 2. Dashboard → **Start Improvement Cycle**.
-3. Qwen analyzes failures, hypothesizes (e.g. "hybrid retrieval improves recall"),
+3. Llama 3.1 analyzes failures, hypothesizes (e.g. "hybrid retrieval improves recall"),
    generates a candidate, runs it in the sandbox against the immutable benchmark.
 4. UI shows score delta (e.g. 78.4 → 84.7) → **APPROVE** → Champion v0.2.0.
 5. Repeat. The second cycle sees the first cycle's history — strategy statistics

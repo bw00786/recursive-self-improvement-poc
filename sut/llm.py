@@ -1,4 +1,4 @@
-"""LLM access for the SUT. Supports Ollama (Qwen) and a deterministic mock.
+"""LLM access for the SUT. Supports Ollama (Llama 3.1) and a deterministic mock.
 
 The mock mode exists so the entire improvement loop is reproducible offline:
 the mock can only answer correctly when retrieval supplies the right context,
@@ -17,7 +17,7 @@ DOC_HEADER_RE = re.compile(r"=== Document: (.+?) ===")
 class OllamaLLM:
     def __init__(self, base_url: str | None = None, model: str | None = None):
         self.base_url = (base_url or os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")).rstrip("/")
-        self.model = model or os.environ.get("OLLAMA_MODEL", "qwen3:8b")
+        self.model = model or os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
         self.name = f"ollama:{self.model}"
 
     def complete(self, prompt: str, system: str | None = None, temperature: float = 0.0) -> str:
