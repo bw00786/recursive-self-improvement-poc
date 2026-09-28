@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: rail
+      POSTGRES_PASSWORD: rail
+      POSTGRES_DB: rail
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rail"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://rail:rail@postgres:5432/rail
+      OLLAMA_BASE_URL: http://ollama:11434
+    ports:
+      - "8100:8000"
+    volumes:
+      # Candidate workspaces + benchmark must be visible to the sandbox runner.
+      - ./:/repo
+      # Docker socket so the backend can launch sandbox containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_API_URL: http://localhost:8100
+    ports:
+      - "5273:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  ollama:

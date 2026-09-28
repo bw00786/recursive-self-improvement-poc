@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+
+# Env / secrets
+.env
+*.local
+
+# Data / runtime artifacts
+rail.db
+*.db
+experiments/candidates/*/
+!experiments/candidates/.gitkeep
+experiments/champion/*/
+!experiments/champion/.gitkeep
+results/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,7 @@
+# Manual sandbox build/run helpers. The backend normally launches containers
+# itself via the Docker CLI; this file exists for debugging.
+services:
+  sandbox:
+    build: .
+    image: rail-sandbox:latest
+    profiles: ["manual"]

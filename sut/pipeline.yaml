@@ -1,0 +1,9 @@
+# Champion v0.1.0 configuration — baseline: Question -> Qwen -> Answer
+system_prompt: |
+  You are a precise technical assistant. Answer the question concisely and accurately.
+query_rewrite: false
+retrieval: none        # none | keyword | vector | hybrid
+rerank: false
+top_k: 4
+temperature: 0.0
+max_context_chars: 4000
