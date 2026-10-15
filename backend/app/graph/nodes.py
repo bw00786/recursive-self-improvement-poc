@@ -50,10 +50,17 @@ def load_champion(state: ImprovementState) -> dict:
 
 def analyze_performance(state: ImprovementState) -> dict:
     llm = AgentLLM()
-    analysis = analyst_agent.analyze(state["current_metrics"], None, llm)
+    with SessionLocal() as db:
+        champion = db.query(Champion).filter_by(version=state["champion_version"]).one()
+        try:
+            misses = benchmark_service.champion_misses(champion)
+        except RuntimeError:
+            misses = []  # proposer still works from aggregate metrics
+    analysis = analyst_agent.analyze(state["current_metrics"], misses, llm)
+    analysis["misses"] = misses
     with SessionLocal() as db:
         audit(db, "ANALYSIS_COMPLETED", experiment=state["experiment_id"],
-              weaknesses=len(analysis["weaknesses"]))
+              weaknesses=len(analysis["weaknesses"]), misses=len(misses))
     return {"analysis": analysis, "failures": analysis["weaknesses"]}
 
 
@@ -65,6 +72,14 @@ def generate_hypothesis(state: ImprovementState) -> dict:
         exp = db.get(Experiment, state["experiment_id"])
         exp.hypothesis = hypothesis
         exp.strategy = hypothesis.get("strategy")
+        if not hypothesis.get("modifications"):
+            exp.status = "FAILED"
+            exp.error = (f"No new ideas: every applicable change has already been "
+                         f"tried on champion v{champion.version}. Benchmark skipped.")
+            exp.completed_at = datetime.now(timezone.utc)
+            db.commit()
+            audit(db, "NO_NEW_IDEAS", experiment=exp.id, champion=champion.version)
+            return {"hypothesis": hypothesis, "decision": "no_change"}
         exp.status = "GENERATING"
         db.commit()
         audit(db, "HYPOTHESIS_GENERATED", experiment=exp.id,

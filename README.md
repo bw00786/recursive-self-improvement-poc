@@ -59,7 +59,7 @@ cd ..
 python scripts/bootstrap.py
 
 # 3. Start the API
-uvicorn backend.app.main:app --reload --port 8100
+uvicorn backend.app.main:app --reload --reload-dir backend --port 8100
 
 # 4. Frontend
 cd frontend

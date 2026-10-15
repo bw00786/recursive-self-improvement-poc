@@ -31,20 +31,26 @@ def compare(candidate_metrics: dict, champion: Champion) -> dict:
     if candidate_metrics.get("failure_rate", 1.0) > 0.0:
         violations.append(f"failure rate {candidate_metrics['failure_rate']:.2%} > 0")
 
-    # Non-regression on quality metrics
+    # Non-regression on quality metrics (tolerance absorbs benchmark noise)
+    tol = max(0.0, s.non_regression_tolerance)
     for m in ("accuracy", "citation_accuracy"):
-        if candidate_metrics.get(m, 0.0) < base.get(m, 0.0) - 1e-6:
+        if candidate_metrics.get(m, 0.0) < base.get(m, 0.0) - tol - 1e-6:
             violations.append(f"{m} regressed: {base.get(m, 0):.4f} -> "
                               f"{candidate_metrics.get(m, 0):.4f}")
 
-    # Practically meaningful composite improvement
+    # Practically meaningful composite improvement. Latency is excluded from the
+    # delta because it varies with host load; the hard latency limit above guards it.
     cand_score = candidate_metrics.get("overall_score", 0.0)
     delta = cand_score - champion.score
-    if delta < s.min_score_improvement:
-        reasons.append(f"score delta {delta:+.2f} below required "
+    quality_delta = delta
+    lat_c, lat_b = candidate_metrics.get("latency_score"), base.get("latency_score")
+    if lat_c is not None and lat_b is not None:
+        quality_delta -= 100.0 * s.eval_weights.get("latency_score", 0.0) * (lat_c - lat_b)
+    if quality_delta < s.min_score_improvement:
+        reasons.append(f"quality delta {quality_delta:+.2f} below required "
                        f"+{s.min_score_improvement}")
 
-    passed = not violations and delta >= s.min_score_improvement
+    passed = not violations and quality_delta >= s.min_score_improvement
     return {
         "passed": passed,
         "hard_violations": violations,
@@ -52,6 +58,7 @@ def compare(candidate_metrics: dict, champion: Champion) -> dict:
         "candidate_score": cand_score,
         "champion_score": champion.score,
         "delta": round(delta, 2),
+        "quality_delta": round(quality_delta, 2),
         "requires_human_approval": s.require_human_approval,
     }
 
@@ -83,6 +90,10 @@ def promote(db: Session, candidate: Candidate, approved_by: str, reason: str = "
         raise RuntimeError("no active champion")
     if candidate.status != "AWAITING_APPROVAL":
         raise RuntimeError(f"candidate {candidate.id} is not awaiting approval")
+    if candidate.parent_version != champion.version:
+        raise RuntimeError(
+            f"candidate was built on v{candidate.parent_version} but the champion is "
+            f"now v{champion.version}; reject it and run a new experiment instead")
 
     new_version = benchmark_service.next_version(champion.version)
     dest = settings.champion_dir / f"v{new_version}"
@@ -90,6 +101,9 @@ def promote(db: Session, candidate: Candidate, approved_by: str, reason: str = "
         shutil.rmtree(dest)  # idempotent re-promotion (e.g. after a crash)
     shutil.copytree(Path(candidate.path) / "sut", dest / "sut",
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    results = Path(candidate.path) / benchmark_service.RESULTS_FILE
+    if results.exists():
+        shutil.copy2(results, dest / benchmark_service.RESULTS_FILE)
     commit = git_service.commit_paths([dest], f"champion v{new_version}: promote {candidate.id}")
 
     champion.status = "retired"

@@ -10,7 +10,7 @@
 ```bash
 cd backend && pip install -e ".[dev]" && cd ..
 python scripts/bootstrap.py          # champion v0.1.0 + baseline score
-uvicorn backend.app.main:app --reload --port 8100
+uvicorn backend.app.main:app --reload --reload-dir backend --port 8100
 cd frontend && npm install && npm run dev   # http://localhost:5273
 ```
 

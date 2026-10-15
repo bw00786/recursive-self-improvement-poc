@@ -29,7 +29,10 @@ def approve(candidate_id: str, body: ApprovalRequest, db: Session = Depends(get_
         raise HTTPException(404, "candidate not found")
     if cand.status != "AWAITING_APPROVAL":
         raise HTTPException(409, f"candidate is {cand.status}, not AWAITING_APPROVAL")
-    champion = promotion_service.promote(db, cand, body.approved_by, body.reason)
+    try:
+        champion = promotion_service.promote(db, cand, body.approved_by, body.reason)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
     return {"promoted": True, "new_champion": champion.version, "score": champion.score}
 
 

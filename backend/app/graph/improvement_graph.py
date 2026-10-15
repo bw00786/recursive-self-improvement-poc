@@ -1,6 +1,7 @@
 """The improvement loop as a LangGraph state machine.
 
 START -> load_champion -> analyze_performance -> generate_hypothesis
+      -> (no new change: END, experiment FAILED "No new ideas")
       -> research_solution -> generate_candidate -> validate_candidate
       -> run_sandbox -> evaluate_candidate -> compare_with_champion
       -> passed: await_approval -> END   (human gate via REST API)
@@ -36,7 +37,11 @@ def build_graph():
     g.add_edge(START, "load_champion")
     g.add_edge("load_champion", "analyze_performance")
     g.add_edge("analyze_performance", "generate_hypothesis")
-    g.add_edge("generate_hypothesis", "research_solution")
+    g.add_conditional_edges(
+        "generate_hypothesis",
+        lambda s: END if s.get("decision") == "no_change" else "research_solution",
+        {END: END, "research_solution": "research_solution"},
+    )
     g.add_edge("research_solution", "generate_candidate")
     g.add_edge("generate_candidate", "validate_candidate")
     g.add_edge("validate_candidate", "run_sandbox")

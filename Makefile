@@ -5,7 +5,7 @@ setup:
 	cd frontend && npm install
 
 backend:
-	uvicorn backend.app.main:app --reload --port 8100
+	uvicorn backend.app.main:app --reload --reload-dir backend --port 8100
 
 frontend:
 	cd frontend && npm run dev

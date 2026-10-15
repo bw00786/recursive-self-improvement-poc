@@ -6,12 +6,14 @@ bad completion.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import yaml
 from sqlalchemy.orm import Session
 
-from ..models import Experiment, StrategyStat
+from ..models import Candidate, Experiment, StrategyStat
+from ..services.candidate_service import clean_prompt
 from ..services.ollama import AgentLLM
 
 REQUIRED_KEYS = {"hypothesis", "proposed_change", "expected_metric",
@@ -104,22 +106,83 @@ def _validate(h: dict) -> bool:
     )
 
 
+def _effective_change(mods: list, cfg: dict) -> dict:
+    """Config keys a modification list would actually change vs the current config."""
+    out: dict = {}
+    for m in mods or []:
+        if not isinstance(m, dict):
+            continue
+        if m.get("type") == "config_update" and isinstance(m.get("updates"), dict):
+            out.update(m["updates"])
+        elif m.get("type") == "prompt_update" and "content" in m:
+            out["system_prompt"] = m["content"]
+    if "system_prompt" in out:
+        out["system_prompt"] = clean_prompt(out["system_prompt"])
+    return {k: v for k, v in out.items() if cfg.get(k) != v}
+
+
+def _history(db: Session, champion, cfg: dict) -> list[dict]:
+    """Changes already evaluated on top of this champion, with their outcome."""
+    rows = (
+        db.query(Candidate, Experiment)
+        .join(Experiment, Candidate.experiment_id == Experiment.id)
+        .filter(Candidate.parent_version == champion.version)
+        .order_by(Candidate.created_at)
+        .all()
+    )
+    history = []
+    for cand, exp in rows:
+        change = _effective_change((exp.hypothesis or {}).get("modifications"), cfg)
+        if not change or any(h["change"] == change for h in history):
+            continue
+        history.append({
+            "strategy": exp.strategy,
+            "change": change,
+            "status": cand.status,
+            "score_delta": (cand.decision or {}).get("delta"),
+        })
+    return history
+
+
 def propose(db: Session, champion, analysis: dict, llm: AgentLLM) -> dict:
     cfg = _champion_config(champion.sut_path)
     tried = {e.strategy for e in db.query(Experiment).all() if e.strategy}
     stats = {s.strategy: s for s in db.query(StrategyStat).all()}
+    history = _history(db, champion, cfg)
+    tried_changes = [h["change"] for h in history]
+
+    def is_new(mods: list) -> bool:
+        change = _effective_change(mods, cfg)
+        return bool(change) and change not in tried_changes
 
     # Real mode: ask Llama first; reject malformed output and fall back.
     if not llm.is_mock:
+        misses = analysis.get("misses") or []
+        miss_text = "\n".join(
+            f"- [{m['id']}] Q: {m['question']}\n"
+            f"  missing facts: {m.get('missing_facts')}; required sources: "
+            f"{m.get('source_documents')}; scores: accuracy={m['accuracy']}, "
+            f"citation={m['citation']}, recall={m['recall']}\n"
+            f"  current answer: {(m.get('answer') or '').strip()[:300]!r}"
+            for m in misses
+        ) or "none recorded"
         resp = llm.complete_json(
             "You are an AI systems optimization engineer.\n\n"
-            f"Current system config:\n{yaml.safe_dump(cfg)}\n"
+            f"Current system config (JSON):\n{json.dumps(cfg, indent=2)}\n"
             f"Champion metrics:\n{champion.metrics}\n"
             f"Observed weaknesses:\n{analysis.get('weaknesses')}\n"
+            f"Benchmark questions the current config gets wrong (fix these):\n"
+            f"{miss_text}\n"
             f"Strategies already tried: {sorted(tried)}\n"
             f"Strategy success rates: "
-            f"{ {k: v.success_rate for k, v in stats.items()} }\n\n"
-            "Propose ONE modification that could measurably improve the system.\n"
+            f"{ {k: v.success_rate for k, v in stats.items()} }\n"
+            f"Changes already evaluated on this exact config (do NOT repeat any of "
+            f"these; a score_delta of 0 means the change had no effect):\n"
+            f"{history or 'none'}\n\n"
+            "Propose ONE modification that could measurably improve the system, "
+            "ideally one that makes the failing questions above pass without "
+            "breaking the others.\n"
+            "It must differ from the current config and from every change above.\n"
             "Constraints: do not modify the evaluator or benchmark; the change "
             "must be reversible; define a measurable success criterion.\n"
             'Schema: {"hypothesis": str, "proposed_change": str, "strategy": str, '
@@ -130,13 +193,13 @@ def propose(db: Session, champion, analysis: dict, llm: AgentLLM) -> dict:
             "(none|keyword|vector|hybrid), rerank, top_k (1-20), temperature, "
             "max_context_chars."
         )
-        if resp and _validate(resp):
+        if resp and _validate(resp) and is_new(resp["modifications"]):
             resp.setdefault("strategy", "llm_proposal")
             return resp
 
     # Deterministic fallback: first applicable untried strategy; otherwise the
     # historically most successful one that still applies.
-    candidates = [p for p in _playbook(cfg) if p["applies"]]
+    candidates = [p for p in _playbook(cfg) if p["applies"] and is_new(p["modifications"])]
     for p in candidates:
         if p["strategy"] not in tried:
             return dict(p)

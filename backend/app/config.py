@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     require_human_approval: bool = True
     hard_max_latency_seconds: float = 30.0
     min_score_improvement: float = 0.5
+    non_regression_tolerance: float = 0.0
     eval_weights_json: str = ""
 
     repo_root: Path = REPO_ROOT

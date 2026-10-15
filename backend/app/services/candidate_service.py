@@ -5,6 +5,7 @@ The LLM never writes to production. It writes to experiments/candidates/<id>/.
 """
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 
@@ -22,13 +23,44 @@ def _champion_sut_dir(champion: Champion) -> Path:
     return Path(champion.sut_path)
 
 
+def clean_prompt(text: str) -> str:
+    """Undo YAML quote-escaping copied by the LLM and drop exact duplicate sentences."""
+    text = " ".join(str(text).replace("''", "'").split())
+    seen, out = set(), []
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        if sentence and sentence not in seen:
+            seen.add(sentence)
+            out.append(sentence)
+    return " ".join(out)
+
+
+def _clean_updates(updates: dict) -> dict:
+    if "system_prompt" in updates:
+        updates = {**updates, "system_prompt": clean_prompt(updates["system_prompt"])}
+    return updates
+
+
+def _normalize_prompt_file(candidate_ws: Path) -> bool:
+    """Clean an inherited prompt so damage in a champion isn't carried forward."""
+    cfg_path = candidate_ws / "sut" / "pipeline.yaml"
+    if not cfg_path.exists():
+        return False
+    cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    prompt = cfg.get("system_prompt")
+    if not prompt or clean_prompt(prompt) == prompt:
+        return False
+    cfg["system_prompt"] = clean_prompt(prompt)
+    cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    return True
+
+
 def apply_modifications(candidate_ws: Path, modifications: list[dict]) -> list[str]:
     """Apply validated modifications; return the list of files changed."""
     changed: set[str] = set()
     for mod in modifications:
         mtype = mod.get("type")
         if mtype == "config_update":
-            updates = security.validate_config_update(mod.get("updates", {}))
+            updates = _clean_updates(security.validate_config_update(mod.get("updates", {})))
             cfg_path = candidate_ws / "sut" / "pipeline.yaml"
             cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
             cfg.update(updates)
@@ -38,7 +70,7 @@ def apply_modifications(candidate_ws: Path, modifications: list[dict]) -> list[s
             rel = mod.get("path") if mtype == "file_write" else "sut/pipeline.yaml"
             content = mod.get("content", "")
             if mtype == "prompt_update":
-                updates = security.validate_config_update({"system_prompt": content})
+                updates = _clean_updates(security.validate_config_update({"system_prompt": content}))
                 cfg_path = candidate_ws / "sut" / "pipeline.yaml"
                 cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
                 cfg.update(updates)
@@ -72,6 +104,8 @@ def create_candidate(db: Session, experiment: Experiment, hypothesis: dict,
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
 
     files_changed = apply_modifications(ws, hypothesis.get("modifications", []))
+    if _normalize_prompt_file(ws) and "sut/pipeline.yaml" not in files_changed:
+        files_changed = sorted([*files_changed, "sut/pipeline.yaml"])
 
     (ws / "CHANGELOG.md").write_text(
         f"# Candidate {candidate.id}\n\n"

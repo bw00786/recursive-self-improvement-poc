@@ -43,7 +43,8 @@ def _weights() -> dict[str, float]:
 def score_item(item: dict, answer: str, citations: list[str], retrieved: list[str]) -> dict:
     low = answer.lower()
     facts = item.get("expected_facts", [])
-    hits = sum(1 for f in facts if f.lower() in low)
+    missing = [f for f in facts if f.lower() not in low]
+    hits = len(facts) - len(missing)
     accuracy = hits / len(facts) if facts else 0.0
 
     required = set(item.get("source_documents", []))
@@ -63,6 +64,7 @@ def score_item(item: dict, answer: str, citations: list[str], retrieved: list[st
         "citation": round(citation, 4),
         "recall": round(recall, 4),
         "keyword_coverage": round(keyword_coverage, 4),
+        "missing_facts": missing,
     }
 
 
@@ -88,7 +90,9 @@ def evaluate(sut_dir: str | Path, benchmark_path: str | Path, llm=None) -> dict:
         r = run_pipeline(item["question"], sut_dir, llm=llm)
         if r.error or not r.answer.strip():
             failures += 1
-        results.append(score_item(item, r.answer, r.citations, r.retrieved))
+        scored = score_item(item, r.answer, r.citations, r.retrieved)
+        scored["answer"] = r.answer[:500]
+        results.append(scored)
         latencies.append(r.latency_ms)
 
     n = len(items) or 1
