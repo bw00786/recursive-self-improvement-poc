@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Box, Button, Card, CardContent, Grid, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardContent, Grid, TextField, Typography } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
@@ -27,22 +28,61 @@ export default function Dashboard() {
     mutationFn: api.runBaseline,
     onSuccess: () => qc.invalidateQueries(),
   });
+  const [cycles, setCycles] = useState(5);
+  const { data: auto } = useQuery({ queryKey: ["auto"], queryFn: api.autoStatus });
+  const autoStart = useMutation({
+    mutationFn: () => api.autoStart(cycles),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+  const autoStop = useMutation({
+    mutationFn: api.autoStop,
+    onSuccess: () => qc.invalidateQueries(),
+  });
 
   const running = experiments?.find((e) => ["RUNNING", "GENERATING", "EVALUATING"].includes(e.status));
 
   return (
     <Box>
-      <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+      <Box sx={{ display: "flex", gap: 2, mb: 3, alignItems: "center", flexWrap: "wrap" }}>
         <Button variant="contained" startIcon={<PlayArrowIcon />}
-          disabled={startCycle.isPending || !!running}
+          disabled={startCycle.isPending || !!running || !!auto?.running}
           onClick={() => startCycle.mutate()}>
           Start Improvement Cycle
         </Button>
-        <Button variant="outlined" disabled={baseline.isPending} onClick={() => baseline.mutate()}>
+        <Button variant="outlined" disabled={baseline.isPending || !!auto?.running}
+          onClick={() => baseline.mutate()}>
           Re-run Baseline
         </Button>
+        <TextField size="small" type="number" label="Cycles" sx={{ width: 90 }}
+          value={cycles} disabled={!!auto?.running}
+          inputProps={{ min: 1, max: 50 }}
+          onChange={(e) => setCycles(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} />
+        {auto?.running ? (
+          <Button color="warning" variant="outlined" disabled={auto.stop_requested || autoStop.isPending}
+            onClick={() => autoStop.mutate()}>
+            {auto.stop_requested ? "Stopping after this cycle…" : "Stop Auto Run"}
+          </Button>
+        ) : (
+          <Button variant="contained" color="secondary" disabled={autoStart.isPending || !!running}
+            onClick={() => autoStart.mutate()}>
+            Auto-run {cycles} cycles
+          </Button>
+        )}
       </Box>
       {startCycle.isError && <Alert severity="error" sx={{ mb: 2 }}>{String(startCycle.error)}</Alert>}
+      {autoStart.isError && <Alert severity="error" sx={{ mb: 2 }}>{String(autoStart.error)}</Alert>}
+      {auto?.running && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Auto run: cycle {Math.min(auto.cycles_completed + 1, auto.cycles_requested)} of {auto.cycles_requested}
+          {auto.promoted.length > 0 && ` — promoted ${auto.promoted.map((v) => "v" + v).join(", ")}`}
+        </Alert>
+      )}
+      {!auto?.running && auto?.stop_reason && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Last auto run: {auto.cycles_completed}/{auto.cycles_requested} cycles, stopped — {auto.stop_reason}
+          {auto.promoted.length > 0 ? `; promoted ${auto.promoted.map((v) => "v" + v).join(", ")}` : "; no promotions"}
+        </Alert>
+      )}
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>

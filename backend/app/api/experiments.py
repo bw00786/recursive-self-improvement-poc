@@ -7,7 +7,8 @@ from ..audit import audit
 from ..database import get_db
 from ..graph.improvement_graph import run_experiment_sync
 from ..models import Candidate, Experiment
-from ..schemas import CandidateOut, ExperimentCreate, ExperimentOut
+from ..schemas import AutoRunRequest, CandidateOut, ExperimentCreate, ExperimentOut
+from ..services import auto_runner
 
 router = APIRouter(tags=["experiments"])
 
@@ -24,6 +25,29 @@ def create_experiment(body: ExperimentCreate, db: Session = Depends(get_db)):
     db.commit()
     audit(db, "EXPERIMENT_CREATED", experiment=exp.id, objective=body.objective)
     return exp
+
+
+# Registered before /{experiment_id} so "auto" isn't captured as an id.
+@router.get("/api/experiments/auto")
+def auto_run_status():
+    return auto_runner.status()
+
+
+@router.post("/api/experiments/auto")
+def auto_run_start(body: AutoRunRequest, db: Session = Depends(get_db)):
+    busy = db.query(Experiment).filter(
+        Experiment.status.in_(("RUNNING", "GENERATING", "EVALUATING"))).first()
+    if busy:
+        raise HTTPException(409, f"experiment {busy.id} is still running")
+    try:
+        return auto_runner.start(body.cycles)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@router.post("/api/experiments/auto/stop")
+def auto_run_stop():
+    return auto_runner.request_stop()
 
 
 @router.get("/api/experiments/{experiment_id}", response_model=ExperimentOut)

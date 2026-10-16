@@ -25,6 +25,14 @@ export const api = {
     }),
   runExperiment: (id: string) =>
     req<import("../types").Experiment>(`/api/experiments/${id}/run`, { method: "POST" }),
+  autoStatus: () => req<import("../types").AutoRunStatus>("/api/experiments/auto"),
+  autoStart: (cycles: number) =>
+    req<import("../types").AutoRunStatus>("/api/experiments/auto", {
+      method: "POST",
+      body: JSON.stringify({ cycles }),
+    }),
+  autoStop: () =>
+    req<import("../types").AutoRunStatus>("/api/experiments/auto/stop", { method: "POST" }),
   candidates: () => req<import("../types").Candidate[]>("/api/candidates"),
   candidate: (id: string) => req<import("../types").Candidate>(`/api/candidates/${id}`),
   evaluations: (candidateId: string) =>

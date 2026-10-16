@@ -78,3 +78,13 @@ export interface Health {
   require_human_approval: boolean;
   langfuse_enabled: boolean;
 }
+
+export interface AutoRunStatus {
+  running: boolean;
+  cycles_requested: number;
+  cycles_completed: number;
+  promoted: string[];
+  current_experiment: string | null;
+  stop_reason: string | null;
+  stop_requested: boolean;
+}

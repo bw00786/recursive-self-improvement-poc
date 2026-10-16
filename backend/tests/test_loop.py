@@ -59,6 +59,19 @@ def test_no_new_ideas_skips_benchmark(monkeypatch):
         assert db.query(Candidate).filter_by(experiment_id=exp_id).count() == 0
 
 
+def test_auto_run_stops_when_out_of_ideas(monkeypatch):
+    from backend.app.agents import improvement_agent
+    from backend.app.services import auto_runner
+
+    monkeypatch.setattr(improvement_agent, "propose", lambda *a, **k: {
+        "strategy": "noop", "hypothesis": "none", "proposed_change": "none",
+        "expected_metric": "overall_score", "expected_improvement": 0.0,
+        "modifications": []})
+    assert auto_runner.run_cycles(3) == "no new ideas"
+    s = auto_runner.status()
+    assert s["cycles_completed"] == 1 and not s["running"] and s["promoted"] == []
+
+
 def test_champion_misses_lists_failing_questions(tmp_path):
     import json
     (tmp_path / "sut").mkdir()

@@ -3,11 +3,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ExperimentCreate(BaseModel):
     objective: str = "Improve the benchmark score"
+
+
+class AutoRunRequest(BaseModel):
+    cycles: int = Field(5, ge=1, le=50)
 
 
 class ExperimentOut(BaseModel):
