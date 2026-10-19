@@ -25,6 +25,48 @@ STRONG_PROMPT = (
     "context is insufficient, say so explicitly instead of guessing."
 )
 
+# Enforced by Ollama structured output, so the model can only emit valid config keys.
+PROPOSAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "hypothesis": {"type": "string"},
+        "proposed_change": {"type": "string"},
+        "strategy": {"type": "string"},
+        "expected_metric": {"type": "string"},
+        "expected_improvement": {"type": "number"},
+        "risk": {"type": "string"},
+        "implementation_plan": {"type": "array", "items": {"type": "string"}},
+        "modifications": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "enum": ["config_update"]},
+                    "updates": {
+                        "type": "object",
+                        "properties": {
+                            "system_prompt": {"type": "string"},
+                            "query_rewrite": {"type": "boolean"},
+                            "retrieval": {"type": "string",
+                                          "enum": ["none", "keyword", "vector", "hybrid"]},
+                            "rerank": {"type": "boolean"},
+                            "top_k": {"type": "integer", "minimum": 1, "maximum": 20},
+                            "temperature": {"type": "number"},
+                            "max_context_chars": {"type": "integer"},
+                            "max_tokens": {"type": "integer", "minimum": 32, "maximum": 4096},
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                "required": ["type", "updates"],
+            },
+        },
+    },
+    "required": ["hypothesis", "proposed_change", "strategy", "expected_metric",
+                 "expected_improvement", "risk", "implementation_plan", "modifications"],
+}
+
 
 def _playbook(cfg: dict) -> list[dict]:
     """Candidate strategies in rough order of expected value, with preconditions."""
@@ -191,7 +233,9 @@ def propose(db: Session, champion, analysis: dict, llm: AgentLLM) -> dict:
             '[{"type": "config_update", "updates": {...}}]}\n'
             "Allowed config keys: system_prompt, query_rewrite, retrieval "
             "(none|keyword|vector|hybrid), rerank, top_k (1-20), temperature, "
-            "max_context_chars."
+            "max_context_chars, max_tokens (32-4096; caps answer length, which "
+            "dominates latency).",
+            schema=PROPOSAL_SCHEMA,
         )
         if resp and _validate(resp) and is_new(resp["modifications"]):
             resp.setdefault("strategy", "llm_proposal")

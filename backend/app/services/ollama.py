@@ -20,6 +20,7 @@ class AgentLLM:
         s = get_settings()
         self.base_url = s.ollama_base_url.rstrip("/")
         self.model = s.ollama_model
+        self.think = s.ollama_think
         mode = s.mock_llm.lower()
         if mode in ("true", "mock"):
             self.is_mock = True
@@ -39,28 +40,39 @@ class AgentLLM:
     def name(self) -> str:
         return "mock" if self.is_mock else f"ollama:{self.model}"
 
-    def complete(self, prompt: str, system: str | None = None) -> str:
+    def complete(self, prompt: str, system: str | None = None,
+                 format: str | dict | None = None) -> str:
         if self.is_mock:
             return ""
         payload = {
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "think": self.think,
             "options": {"temperature": 0.2},
         }
         if system:
             payload["system"] = system
+        if format:
+            payload["format"] = format
         with httpx.Client(timeout=240.0, trust_env=False) as client:
             resp = client.post(f"{self.base_url}/api/generate", json=payload)
             resp.raise_for_status()
             return resp.json().get("response", "")
 
-    def complete_json(self, prompt: str, system: str | None = None) -> dict | None:
-        """Ask for JSON; return None on malformed output (callers reject/fallback)."""
+    def complete_json(self, prompt: str, system: str | None = None,
+                      schema: dict | None = None) -> dict | None:
+        """Structured output (JSON schema, else plain JSON mode); None on malformed output."""
         try:
-            text = self.complete(prompt + "\n\nReturn ONLY valid JSON.", system=system)
+            text = self.complete(prompt + "\n\nReturn ONLY valid JSON.", system=system,
+                                 format=schema or "json")
         except Exception:
             return None
+        try:
+            data = json.loads(text)
+            return data if isinstance(data, dict) else None
+        except (json.JSONDecodeError, TypeError):
+            pass
         m = JSON_BLOCK_RE.search(text or "")
         if not m:
             return None

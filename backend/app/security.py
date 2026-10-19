@@ -26,6 +26,7 @@ ALLOWED_CONFIG_KEYS = {
     "top_k",
     "temperature",
     "max_context_chars",
+    "max_tokens",
 }
 ALLOWED_RETRIEVAL_MODES = {"none", "keyword", "vector", "hybrid"}
 
@@ -98,6 +99,8 @@ def validate_config_update(updates: dict) -> dict:
             raise SecurityViolation("temperature must be in [0, 1]")
         if key == "max_context_chars" and not (isinstance(value, int) and 200 <= value <= 32000):
             raise SecurityViolation("max_context_chars must be an int in [200, 32000]")
+        if key == "max_tokens" and not (isinstance(value, int) and 32 <= value <= 4096):
+            raise SecurityViolation("max_tokens must be an int in [32, 4096]")
         if key == "system_prompt" and (not isinstance(value, str) or len(value) > 8000):
             raise SecurityViolation("system_prompt must be a string <= 8000 chars")
         clean[key] = value

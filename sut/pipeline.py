@@ -87,7 +87,10 @@ def run_pipeline(question: str, sut_dir: str | Path, llm=None) -> PipelineResult
                 f"you use with [source: <name>].\n\n{context}\n"
             )
         system = cfg.get("system_prompt") or DEFAULT_CONFIG["system_prompt"]
-        answer = llm.complete(prompt, system=system, temperature=float(cfg.get("temperature", 0.0)))
+        # Only pass the cap when configured, so LLMs without the kwarg still work.
+        extra = {"max_tokens": int(cfg["max_tokens"])} if cfg.get("max_tokens") else {}
+        answer = llm.complete(prompt, system=system,
+                              temperature=float(cfg.get("temperature", 0.0)), **extra)
         latency = (time.perf_counter() - start) * 1000
         return PipelineResult(
             answer=answer,

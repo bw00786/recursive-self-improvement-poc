@@ -18,15 +18,20 @@ class OllamaLLM:
     def __init__(self, base_url: str | None = None, model: str | None = None):
         self.base_url = (base_url or os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")).rstrip("/")
         self.model = model or os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+        self.think = os.environ.get("OLLAMA_THINK", "false").lower() in ("1", "true", "yes")
         self.name = f"ollama:{self.model}"
 
-    def complete(self, prompt: str, system: str | None = None, temperature: float = 0.0) -> str:
+    def complete(self, prompt: str, system: str | None = None, temperature: float = 0.0,
+                 max_tokens: int | None = None) -> str:
         payload = {
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "think": self.think,
             "options": {"temperature": temperature},
         }
+        if max_tokens:
+            payload["options"]["num_predict"] = int(max_tokens)
         if system:
             payload["system"] = system
         with httpx.Client(timeout=180.0, trust_env=False) as client:
@@ -47,7 +52,8 @@ class MockLLM:
 
     name = "mock"
 
-    def complete(self, prompt: str, system: str | None = None, temperature: float = 0.0) -> str:
+    def complete(self, prompt: str, system: str | None = None, temperature: float = 0.0,
+                 max_tokens: int | None = None) -> str:
         sections = re.split(r"(=== Document: .+? ===)", prompt)
         docs: list[tuple[str, str]] = []
         for i in range(1, len(sections) - 1, 2):

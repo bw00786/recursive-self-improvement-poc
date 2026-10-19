@@ -72,6 +72,7 @@ def _env() -> dict[str, str]:
     return {
         "OLLAMA_BASE_URL": s.ollama_base_url,
         "OLLAMA_MODEL": s.ollama_model,
+        "OLLAMA_THINK": str(s.ollama_think).lower(),
         "MOCK_LLM": s.mock_llm,
         "SUT_LLM": s.mock_llm,
     }

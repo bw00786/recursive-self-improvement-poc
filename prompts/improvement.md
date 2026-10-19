@@ -33,4 +33,4 @@ Return structured JSON only:
 
 Allowed config keys: system_prompt, query_rewrite, retrieval
 (none|keyword|vector|hybrid), rerank, top_k (1-20), temperature (0-1),
-max_context_chars (200-32000).
+max_context_chars (200-32000), max_tokens (32-4096, caps answer length).

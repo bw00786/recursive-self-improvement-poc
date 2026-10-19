@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"
+    ollama_think: bool = False  # chain-of-thought for reasoning models (qwen3, gpt-oss)
     mock_llm: str = "auto"  # auto | true | false
 
     langfuse_enabled: bool = False
